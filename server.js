@@ -569,12 +569,18 @@ async function launchBrowserInstance() {
       ? proxyPool.getLaunchProxy(proxyPool.canRotateSessions ? `browser-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}` : undefined)
       : null;
 
+    const isHeadful = process.argv.includes('--headful') || process.env.HEADFUL === '1' || process.env.HEADFUL === 'true';
+
+    if (isHeadful) {
+      log('info', '!!! STARTING IN HEADFUL MODE !!! (No virtual display)');
+    }
+
     let localVirtualDisplay = null;
     let vdDisplay = undefined;
     let candidateBrowser = null;
 
     try {
-      if (os.platform() === 'linux') {
+      if (os.platform() === 'linux' && !isHeadful) {
         localVirtualDisplay = new VirtualDisplay();
         vdDisplay = localVirtualDisplay.get();
         log('info', 'xvfb virtual display started', { display: vdDisplay, attempt });
@@ -599,7 +605,7 @@ async function launchBrowserInstance() {
 
     try {
       const options = await launchOptions({
-        headless: useVirtualDisplay ? false : true,
+        headless: isHeadful ? false : (useVirtualDisplay ? false : true),
         os: hostOS,
         humanize: true,
         enable_cache: true,
