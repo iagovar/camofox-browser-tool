@@ -726,8 +726,9 @@ async function getSession(userId) {
       throw new Error('Maximum concurrent sessions reached');
     }
     const b = await ensureBrowser();
+    const isHeadful = process.argv.includes('--headful') || process.env.HEADFUL === '1' || process.env.HEADFUL === 'true';
     const contextOptions = {
-      viewport: { width: 1280, height: 720 },
+      viewport: isHeadful ? null : { width: 1280, height: 720 },
       permissions: ['geolocation'],
     };
     // When geoip is active (proxy configured), camoufox auto-configures
@@ -3268,6 +3269,22 @@ const server = app.listen(PORT, async () => {
     const start = Date.now();
     await ensureBrowser();
     log('info', 'browser pre-warmed', { ms: Date.now() - start });
+    
+    const isHeadful = process.argv.includes('--headful') || process.env.HEADFUL === '1' || process.env.HEADFUL === 'true';
+    if (isHeadful && browser) {
+      log('info', 'forcing headful window to foreground via dummy tab');
+      try {
+        const dummySession = await getSession('headful_warmup_user');
+        const dummyGroup = getTabGroup(dummySession, 'headful_warmup_session');
+        const dummyPage = await dummySession.context.newPage();
+        const dummyState = createTabState(dummyPage);
+        dummyGroup.set('warmup_tab', dummyState);
+        await dummyPage.goto('about:blank');
+      } catch (e) {
+        log('warn', 'failed to force foreground window', { error: e.message });
+      }
+    }
+
     scheduleBrowserIdleShutdown();
   } catch (err) {
     log('error', 'browser pre-warm failed (will retry in background)', { error: err.message });
